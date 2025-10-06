@@ -1,0 +1,145 @@
+{
+  "name": "apple-music-mcp",
+  "version": "0.1.0",
+  "description": "Hybrid MCP for searching and controlling Apple Music.",
+  "contact_email": "dev@inwonder.example",
+  "tools": [
+    {
+      "name": "search_music",
+      "description": "Search the Apple Music catalog via MusicKit.",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "term": {"type": "string", "description": "Search query"},
+          "types": {
+            "type": "array",
+            "items": {"type": "string"},
+            "default": ["songs"],
+            "description": "Resource types to search"
+          },
+          "limit": {"type": "integer", "minimum": 1, "maximum": 25, "default": 10},
+          "offset": {"type": "integer", "minimum": 0, "default": 0}
+        },
+        "required": ["term"]
+      }
+    },
+    {
+      "name": "play_song",
+      "description": "Play a song using AppleScript and MusicKit metadata.",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "track_id": {"type": "string", "description": "Catalog identifier"},
+          "play_location_url": {
+            "type": ["string", "null"],
+            "description": "Optional Apple Music URL to open"
+          }
+        },
+        "required": ["track_id"]
+      }
+    },
+    {
+      "name": "control_playback",
+      "description": "Control playback state (play, pause, next, previous, shuffle, repeat).",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": ["play", "pause", "next", "previous", "toggle_shuffle", "toggle_repeat"]
+          },
+          "shuffle_mode": {
+            "type": ["string", "null"],
+            "enum": ["off", "songs", "albums", null],
+            "description": "Target shuffle state when action=toggle_shuffle"
+          },
+          "repeat_mode": {
+            "type": ["string", "null"],
+            "enum": ["off", "one", "all", null],
+            "description": "Target repeat state when action=toggle_repeat"
+          }
+        },
+        "required": ["action"]
+      }
+    },
+    {
+      "name": "manage_queue",
+      "description": "Add to, view, or clear the Apple Music queue.",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {"type": "string", "enum": ["add", "view", "clear"]},
+          "track_id": {
+            "type": ["string", "null"],
+            "description": "Track identifier when action=add"
+          },
+          "play_next": {
+            "type": "boolean",
+            "default": false,
+            "description": "Insert the track to play next"
+          }
+        },
+        "required": ["action"]
+      }
+    },
+    {
+      "name": "add_to_library",
+      "description": "Add an item to the Apple Music library.",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "track_id": {"type": "string", "description": "Catalog identifier"}
+        },
+        "required": ["track_id"]
+      }
+    },
+    {
+      "name": "remove_from_library",
+      "description": "Remove an item from the Apple Music library.",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "track_id": {"type": "string", "description": "Catalog identifier"}
+        },
+        "required": ["track_id"]
+      }
+    },
+    {
+      "name": "create_playlist",
+      "description": "Create a playlist from catalog tracks.",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {"type": "string", "description": "Playlist name"},
+          "description": {
+            "type": ["string", "null"],
+            "description": "Optional playlist description"
+          },
+          "track_ids": {
+            "type": "array",
+            "items": {"type": "string"},
+            "default": []
+          }
+        },
+        "required": ["name"]
+      }
+    },
+    {
+      "name": "mcp.health_check",
+      "description": "Verify access to AppleScript and MusicKit APIs.",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {},
+        "required": []
+      }
+    }
+  ]
+}
