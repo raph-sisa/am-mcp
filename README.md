@@ -24,8 +24,10 @@ apple-music-mcp/
 ├── utils/
 │   ├── apple_script.py
 │   ├── auth.py
+│   ├── musickit.py
 │   └── exceptions.py
 ├── tests/
+│   ├── test_auth.py
 │   └── test_dispatcher.py
 ├── .env.example
 └── docs/
@@ -75,15 +77,15 @@ apple-music-mcp/
 ## Tools Overview
 | Tool | Purpose | Notes |
 | ---- | ------- | ----- |
-| `search_music` | Discover catalog items using MusicKit. | Validates query, result schema TBD. |
-| `play_song` | Launch playback of a track. | Hybrid flow via AppleScript and MusicKit metadata. |
-| `control_playback` | Manage playback state (play, pause, skip, shuffle, repeat). | Designed to drive AppleScript commands. |
-| `manage_queue` | Add to, view, or clear the Apple Music play queue. | Supports `add`, `view`, and `clear` intents. |
-| `add_to_library` / `remove_from_library` | Manage the local library. | Requires MusicKit and local sync. |
-| `create_playlist` | Create playlists seeded with catalog tracks. | Accepts optional descriptions and initial track IDs. |
-| `mcp.health_check` | Probe AppleScript and MusicKit readiness. | Performs combined diagnostics before exposing other tools. |
+| `search_music` | Discover catalog items using MusicKit. | Normalizes song metadata, caches results, and retries transient failures. |
+| `play_song` | Launch playback of a track. | Fetches catalog metadata, resolves playback URLs, and triggers AppleScript playback. |
+| `control_playback` | Manage playback state (play, pause, skip, shuffle, repeat). | Sends concrete AppleScript commands with shuffle/repeat state toggles. |
+| `manage_queue` | Add to, view, or clear the Apple Music play queue. | Uses AppleScript to add songs, inspect the queue, and clear items. |
+| `add_to_library` / `remove_from_library` | Manage the local library. | Adds or removes tracks via AppleScript, using MusicKit metadata for matching. |
+| `create_playlist` | Create playlists seeded with catalog tracks. | Builds/refreshes playlists and injects catalog songs via AppleScript automation. |
+| `mcp.health_check` | Probe AppleScript and MusicKit readiness. | Executes a play/pause probe and MusicKit search, returning per-check diagnostics. |
 
-Each tool enforces strict argument validation (`pydantic` with `extra=forbid`) and returns standardized success or error payloads (`{code, message, hint}` on failure).
+Each tool enforces strict argument validation with explicit type and bounds checks, returning standardized success or error payloads (`{code, message, hint}` on failure).
 
 ## Development Tasks
 - `make lint` — Static analysis with Ruff.
@@ -92,10 +94,9 @@ Each tool enforces strict argument validation (`pydantic` with `extra=forbid`) a
 - `make format` — Apply import sorting and formatting (Ruff).
 
 ## Testing Strategy
-Current unit tests live in `tests/test_dispatcher.py` and assert:
-- Unknown tools return an `unknown_tool` error.
-- Invalid arguments trigger `invalid_arguments` with descriptive hints.
-- The health check rejects unexpected payloads.
+Unit tests include:
+- `tests/test_dispatcher.py` validating dispatcher error paths.
+- `tests/test_auth.py` covering configuration loading, JWT minting, and caching safeguards.
 
 Future test work includes:
 - Mocked AppleScript execution for playback flows.
@@ -108,7 +109,7 @@ Future test work includes:
 - Review [`docs/permissions.md`](docs/permissions.md) for step-by-step screenshots and remediation tips.
 
 ## Roadmap
-- Implement real AppleScript helpers that gracefully handle app launch, permission denials, and error reporting.
-- Add MusicKit authentication utilities for ES256 token minting and catalog search with retry/backoff.
+- Extend queue inspection to return structured metadata instead of string summaries.
+- Implement additional error telemetry for AppleScript failures (e.g., Automation permission prompts).
 - Provide a `now_playing` optional tool once playback metadata is accessible.
 - Expand documentation with setup videos or quick-start scripts (e.g., Homebrew formula) when the core flows are stable.

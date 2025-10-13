@@ -9,9 +9,11 @@ import uuid
 from dataclasses import dataclass
 from typing import Any, Callable, Dict
 
-from dotenv import load_dotenv
-from pydantic import BaseModel, Extra, Field, ValidationError
-
+try:  # pragma: no cover - optional dependency
+    from dotenv import load_dotenv
+except ModuleNotFoundError:  # pragma: no cover - fallback when python-dotenv is unavailable
+    def load_dotenv(*_args, **_kwargs) -> bool:
+        return False
 from handlers import health as health_handler
 from handlers import library as library_handler
 from handlers import play as play_handler
@@ -27,26 +29,74 @@ from utils.exceptions import ToolError
 RequestHandler = Callable[[Dict[str, Any]], Dict[str, Any]]
 
 
-class ToolRequest(BaseModel):
+@dataclass
+class ToolRequest:
     """Incoming request payload."""
 
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    id: str
     name: str
-    arguments: Dict[str, Any] = Field(default_factory=dict)
+    arguments: Dict[str, Any]
 
-    class Config:
-        extra = Extra.forbid
+    @classmethod
+    def from_payload(cls, payload: Dict[str, Any]) -> "ToolRequest":
+        if not isinstance(payload, dict):
+            raise ToolError(
+                code="invalid_request",
+                message="Request payload must be a JSON object.",
+                hint="Ensure the MCP host sends a JSON object with name and arguments.",
+            )
+
+        unexpected_keys = set(payload.keys()) - {"id", "name", "arguments"}
+        if unexpected_keys:
+            raise ToolError(
+                "invalid_request",
+                "Request contained unexpected fields.",
+                f"Remove unsupported keys: {', '.join(sorted(unexpected_keys))}.",
+            )
+
+        name = payload.get("name")
+        if not isinstance(name, str) or not name:
+            raise ToolError(
+                "invalid_request",
+                "Tool name is required and must be a string.",
+                "Include the 'name' property with the target tool identifier.",
+            )
+
+        arguments = payload.get("arguments", {})
+        if not isinstance(arguments, dict):
+            raise ToolError(
+                "invalid_request",
+                "Tool arguments must be an object.",
+                "Wrap arguments in a JSON object even when empty.",
+            )
+
+        request_id = payload.get("id")
+        if request_id is None:
+            request_id = str(uuid.uuid4())
+        elif not isinstance(request_id, str):
+            raise ToolError(
+                "invalid_request",
+                "Request id must be a string when provided.",
+                "Use a string identifier such as a UUID.",
+            )
+
+        return cls(id=request_id, name=name, arguments=arguments)
 
 
-class ToolResponse(BaseModel):
+@dataclass
+class ToolResponse:
     """Standard tool response payload."""
 
     request_id: str
     status: str
     result: Dict[str, Any]
 
-    class Config:
-        extra = Extra.forbid
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "request_id": self.request_id,
+            "status": self.status,
+            "result": self.result,
+        }
 
 
 @dataclass
@@ -85,14 +135,7 @@ class Dispatcher:
         self._handlers[name] = RegisteredHandler(handler=handler, description=description)
 
     def dispatch(self, payload: Dict[str, Any]) -> ToolResponse:
-        try:
-            request = ToolRequest(**payload)
-        except ValidationError as exc:
-            raise ToolError(
-                code="invalid_request",
-                message="Request validation failed.",
-                hint=str(exc),
-            ) from exc
+        request = ToolRequest.from_payload(payload)
 
         request_id = request.id
         logger = logging.LoggerAdapter(self._logger, extra={"request_id": request_id})
@@ -184,7 +227,7 @@ def handle_cli() -> int:
         print(json.dumps({"status": "error", **exc.to_dict()}))
         return 2
 
-    print(response.model_dump())
+    print(response.to_dict())
     return 0
 
 
